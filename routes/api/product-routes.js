@@ -33,74 +33,38 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// create new product
-router.post('/', async (req, res) => {
-  try {
-    const newProduct = await Product.create(req.body);
-
-    if (req.body.tagIds && req.body.tagIds.length) {
-      const productTagIdArr = req.body.tagIds.map((tag_id) => {
-        return {
-          product_id: newProduct.id,
-          tag_id,
-        };
-      });
-      await ProductTag.bulkCreate(productTagIdArr);
-    }
-
-    res.status(201).json(newProduct);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json(err);
-  }
-});
-
 // update product by its `id` value
 router.put('/:id', async (req, res) => {
   try {
-    const [rowsAffected, updatedProduct] = await Product.update(req.body, {
-      where: {
-        id: req.params.id,
-      },
+    const productId = req.params.id;
+    const productData = req.body;
+
+    if (!productId) {
+      return res.status(400).json({ message: 'Product ID is required' });
+    }
+
+    const existingProduct = await Product.findByPk(productId);
+
+    if (!existingProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const [rowsAffected, updatedProduct] = await Product.update(productData, {
+      where: { id: productId },
       returning: true,
     });
 
-    if (req.body.tagIds && req.body.tagIds.length) {
-      const productTags = await ProductTag.findAll({
-        where: { product_id: req.params.id }
-      });
-      
-      const productTagIds = productTags.map(({ tag_id }) => tag_id);
-      const newProductTags = req.body.tagIds
-        .filter((tag_id) => !productTagIds.includes(tag_id))
-        .map((tag_id) => {
-          return {
-            product_id: req.params.id,
-            tag_id,
-          };
-        });
-
-      const productTagsToRemove = productTags
-        .filter(({ tag_id }) => !req.body.tagIds.includes(tag_id))
-        .map(({ id }) => id);
-
-      await Promise.all([
-        ProductTag.destroy({ where: { id: productTagsToRemove } }),
-        ProductTag.bulkCreate(newProductTags),
-      ]);
-    }
-
-    if (!rowsAffected) {
-      res.status(404).json({ message: 'Product not found' });
-      return;
+    if (rowsAffected === 0) {
+      return res.status(404).json({ message: 'Product not found' });
     }
 
     res.json(updatedProduct);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json(err);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // delete one product by its `id` value
 router.delete('/:id', async (req, res) => {

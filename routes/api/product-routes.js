@@ -32,6 +32,36 @@ router.get('/:id', async (req, res) => {
     res.status(500).json(err);
   }
 });
+router.post('/', async (req, res) => {
+  try {
+    const { product_name, price, stock, category_id, tags } = req.body;
+
+    const newProduct = await Product.create({
+      product_name,
+      price,
+      stock,
+      category_id
+    });
+
+    if (tags && tags.length > 0) {
+      await Promise.all(tags.map(async tagId => {
+        const tag = await Tag.findByPk(tagId);
+        if (tag) {
+          await ProductTag.create({
+            product_id: newProduct.id,
+            tag_id: tag.id
+          });
+        }
+      }));
+    }
+
+    res.status(201).json(newProduct);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 
 // update product by its `id` value
 router.put('/:id', async (req, res) => {
